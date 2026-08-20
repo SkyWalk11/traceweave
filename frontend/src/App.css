@@ -44,6 +44,73 @@
   cursor: pointer;
 }
 
+.workspace-switcher {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #333;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  background: #161616;
+}
+
+.workspace-label {
+  opacity: 0.6;
+  margin-right: 2px;
+}
+
+.workspace-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid #444;
+  background: #222;
+  cursor: pointer;
+}
+
+.workspace-chip.active {
+  background: #24304a;
+  border-color: #3d5a9e;
+  color: #9db8ff;
+}
+
+.workspace-chip-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 10px;
+}
+
+.workspace-chip-remove:hover {
+  opacity: 1;
+}
+
+.workspace-add {
+  font-size: 12px;
+  padding: 3px 8px;
+  background: #222;
+  color: inherit;
+  border: 1px solid #444;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.workspace-rename-form input {
+  font-size: 12px;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #eee;
+  padding: 3px 6px;
+}
+
 .project-chip {
   display: inline-flex;
   align-items: center;
@@ -118,8 +185,86 @@
   font-size: 13px;
 }
 
-.logs-modal {
-  width: 640px;
+.modal.logs-modal {
+  width: min(1300px, 95vw);
+  max-height: 85vh;
+}
+
+.ansi-black {
+  color: #5c5c5c;
+}
+.ansi-red {
+  color: #f14c4c;
+}
+.ansi-green {
+  color: #23d18b;
+}
+.ansi-yellow {
+  color: #f5f543;
+}
+.ansi-blue {
+  color: #3b8eea;
+}
+.ansi-magenta {
+  color: #d670d6;
+}
+.ansi-cyan {
+  color: #29b8db;
+}
+.ansi-white {
+  color: #e5e5e5;
+}
+.ansi-bright-black {
+  color: #767676;
+}
+.ansi-bright-red {
+  color: #ff6e6e;
+}
+.ansi-bright-green {
+  color: #4de8a6;
+}
+.ansi-bright-yellow {
+  color: #f5f57a;
+}
+.ansi-bright-blue {
+  color: #6cb8ff;
+}
+.ansi-bright-magenta {
+  color: #e69fe6;
+}
+.ansi-bright-cyan {
+  color: #5fd8f2;
+}
+.ansi-bright-white {
+  color: #ffffff;
+}
+.ansi-bold {
+  font-weight: 700;
+}
+
+.logs-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #333;
+}
+
+.logs-search input {
+  flex: 1;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #eee;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.logs-search-count {
+  opacity: 0.6;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .logs-body {
@@ -129,14 +274,20 @@
   background: #111;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11px;
-  min-height: 200px;
-  max-height: 400px;
+  min-height: 300px;
+  max-height: 65vh;
 }
 
 .logs-line {
   white-space: pre-wrap;
   word-break: break-all;
   line-height: 1.5;
+}
+
+.logs-line mark {
+  background: #5a4a1a;
+  color: inherit;
+  border-radius: 2px;
 }
 
 .logs-empty {
@@ -215,10 +366,15 @@
 
 .command-edit-form {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .command-edit-form input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   background: #1a1a1a;
   border: 1px solid #444;
   border-radius: 4px;
@@ -648,6 +804,59 @@
 
 .pane-waiting {
   opacity: 0.7;
+}
+
+.pane-tabs {
+  display: flex;
+  overflow-x: auto;
+  flex-shrink: 0;
+  background: #161616;
+  border-bottom: 1px solid #333;
+  scrollbar-width: thin;
+}
+
+.pane-tabs::-webkit-scrollbar {
+  height: 5px;
+}
+
+.pane-tabs::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+.pane-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pane-tab {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  background: none;
+  color: #999;
+  border: none;
+  border-right: 1px solid #2a2a2a;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: system-ui, sans-serif;
+  white-space: nowrap;
+}
+
+.pane-tab:hover {
+  color: #ddd;
+  background: #1e1e1e;
+}
+
+.pane-tab.active {
+  color: #eee;
+  background: #1e1e1e;
+  border-bottom-color: #5a8fdb;
+}
+
+.pane-tab.live:not(.active)::after {
+  content: " ●";
+  color: #5a8fdb;
+  font-size: 8px;
 }
 
 .service-folder {

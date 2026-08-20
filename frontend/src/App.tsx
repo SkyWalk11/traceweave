@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useStore } from "./store/useStore";
 import { computeServicePanes } from "./utils/computeServicePanes";
 import { ProjectsBar } from "./components/ProjectsBar";
+import { WorkspaceSwitcher } from "./components/WorkspaceSwitcher";
 import { Scrubber } from "./components/Scrubber";
 import { Topology } from "./components/Topology";
 import { StepList, STEP_LIST_DEFAULT_WIDTH } from "./components/StepList";
@@ -11,6 +12,7 @@ import "./App.css";
 
 export default function App() {
   const connect = useStore((s) => s.connect);
+  const loadWorkspaces = useStore((s) => s.loadWorkspaces);
   const loadProjects = useStore((s) => s.loadProjects);
   const loadTraces = useStore((s) => s.loadTraces);
   const traces = useStore((s) => s.traces);
@@ -21,6 +23,7 @@ export default function App() {
 
   useEffect(() => {
     connect();
+    loadWorkspaces();
     loadProjects();
     loadTraces();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -36,6 +39,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <WorkspaceSwitcher />
       <ProjectsBar />
       <Scrubber />
       <Topology panes={panes} />

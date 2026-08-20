@@ -22,6 +22,12 @@ export interface Project {
 
 export type ServiceBindings = Record<string, string>; // service name -> project id
 
+export interface Workspace {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
 export type ProcessStatus = "stopped" | "running" | "crashed";
 
 export interface BrowseResult {

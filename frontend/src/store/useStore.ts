@@ -13,14 +13,23 @@ import {
   updateProjectApi,
 } from "../api/projects";
 import { setBreakpoint as setBreakpointApi } from "../api/breakpoints";
+import { fetchUiState, saveUiState } from "../api/uiState";
+import {
+  activateWorkspaceApi,
+  createWorkspaceApi,
+  deleteWorkspaceApi,
+  fetchWorkspaces,
+  renameWorkspaceApi,
+} from "../api/workspaces";
 import { sourceKey } from "../utils/sourceKey";
 import { breakpointKey } from "../utils/breakpointKey";
-import type { BrowseResult, ProcessStatus, Project, ServiceBindings, StepSnapshot, Trace } from "../types";
+import type { BrowseResult, ProcessStatus, Project, ServiceBindings, StepSnapshot, Trace, Workspace } from "../types";
 
 const MAX_LOG_LINES = 500;
 
 interface StoreState {
-  projects: Project[]; // registry of local folders, any number
+  workspaces: Workspace[]; // named, switchable groups of projects/bindings/traces
+  projects: Project[]; // registry of local folders, any number, scoped to the active workspace
   serviceBindings: ServiceBindings; // service name -> project id
   processStatuses: Record<string, ProcessStatus>; // project id -> status
   projectLogs: Record<string, string[]>; // project id -> buffered log lines
@@ -32,6 +41,11 @@ interface StoreState {
 
   connect(): void;
   toggleBreakpoint(service: string, file: string, line: number): Promise<void>;
+  loadWorkspaces(): Promise<void>;
+  createWorkspace(name: string): Promise<void>;
+  switchWorkspace(id: string): Promise<void>;
+  renameWorkspace(id: string, name: string): Promise<void>;
+  deleteWorkspace(id: string): Promise<void>;
   loadProjects(): Promise<void>;
   addProject(name: string, dir: string, runCommand?: string): Promise<Project>;
   updateProject(id: string, patch: { name?: string; runCommand?: string }): Promise<void>;
@@ -50,9 +64,11 @@ interface StoreState {
   stepNext(): void;
   stepPrev(): void;
   setStepIndex(index: number): void;
+  persistUiState(): void;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
+  workspaces: [],
   projects: [],
   serviceBindings: {},
   processStatuses: {},
@@ -73,6 +89,53 @@ export const useStore = create<StoreState>((set, get) => ({
       else next.add(key);
       return { breakpoints: next };
     });
+  },
+
+  async loadWorkspaces() {
+    const { workspaces } = await fetchWorkspaces();
+    set({ workspaces });
+  },
+
+  async createWorkspace(name) {
+    const { workspaces } = await createWorkspaceApi(name);
+    set({ workspaces });
+    // createWorkspaceApi activates the new (empty) workspace — reload
+    // everything scoped to it so the UI doesn't keep showing the old one's
+    // projects/traces.
+    set({ projects: [], serviceBindings: {}, traces: [], activeTraceIndex: -1, stepIndex: 0, sourceCache: {} });
+    await get().loadProjects();
+    await get().loadTraces();
+  },
+
+  async switchWorkspace(id) {
+    const { workspaces } = await activateWorkspaceApi(id);
+    set({
+      workspaces,
+      projects: [],
+      serviceBindings: {},
+      traces: [],
+      activeTraceIndex: -1,
+      stepIndex: 0,
+      sourceCache: {},
+    });
+    await get().loadProjects();
+    await get().loadTraces();
+  },
+
+  async renameWorkspace(id, name) {
+    const { workspaces } = await renameWorkspaceApi(id, name);
+    set({ workspaces });
+  },
+
+  async deleteWorkspace(id) {
+    const wasActive = get().workspaces.find((w) => w.id === id)?.active;
+    const { workspaces } = await deleteWorkspaceApi(id);
+    set({ workspaces });
+    if (wasActive) {
+      set({ projects: [], serviceBindings: {}, traces: [], activeTraceIndex: -1, stepIndex: 0, sourceCache: {} });
+      await get().loadProjects();
+      await get().loadTraces();
+    }
   },
 
   connect() {
@@ -98,6 +161,7 @@ export const useStore = create<StoreState>((set, get) => ({
           };
         });
         get().loadActiveTraceSources();
+        get().persistUiState();
       },
       onLog(projectId, lines) {
         set((s) => {
@@ -171,15 +235,25 @@ export const useStore = create<StoreState>((set, get) => ({
     return browseFolder(dir);
   },
 
+  // Restores whichever trace/step you were last on (per workspace, saved in
+  // the backend's sqlite db), instead of always jumping to the newest trace.
   async loadTraces() {
     const traces = await fetchTraces();
-    set({ traces, activeTraceIndex: traces.length - 1, stepIndex: 0 });
+    const uiState = await fetchUiState().catch(() => ({ activeTraceId: null, stepIndex: 0 }));
+    const restoredIndex = uiState.activeTraceId
+      ? traces.findIndex((t) => t.traceId === uiState.activeTraceId)
+      : -1;
+    const activeTraceIndex = restoredIndex !== -1 ? restoredIndex : traces.length - 1;
+    const total = traces[activeTraceIndex]?.steps?.length ?? 0;
+    const stepIndex = restoredIndex !== -1 ? Math.min(Math.max(uiState.stepIndex, 0), Math.max(total - 1, 0)) : 0;
+    set({ traces, activeTraceIndex, stepIndex });
     get().loadActiveTraceSources();
   },
 
   setActiveTrace(index) {
     set({ activeTraceIndex: index, stepIndex: 0 });
     get().loadActiveTraceSources();
+    get().persistUiState();
   },
 
   activeTrace() {
@@ -251,16 +325,34 @@ export const useStore = create<StoreState>((set, get) => ({
   stepNext() {
     const { traces, activeTraceIndex, stepIndex } = get();
     const total = traces[activeTraceIndex]?.steps?.length ?? 0;
-    if (stepIndex < total - 1) set({ stepIndex: stepIndex + 1 });
+    if (stepIndex < total - 1) {
+      set({ stepIndex: stepIndex + 1 });
+      get().persistUiState();
+    }
   },
 
   stepPrev() {
     const { stepIndex } = get();
-    if (stepIndex > 0) set({ stepIndex: stepIndex - 1 });
+    if (stepIndex > 0) {
+      set({ stepIndex: stepIndex - 1 });
+      get().persistUiState();
+    }
   },
 
   setStepIndex(index) {
     const total = get().activeTrace()?.steps?.length ?? 0;
-    if (index >= 0 && index < total) set({ stepIndex: index });
+    if (index >= 0 && index < total) {
+      set({ stepIndex: index });
+      get().persistUiState();
+    }
+  },
+
+  // Fire-and-forget: saves which trace/step is active for the current
+  // workspace, so reopening the debugger (or switching back to this
+  // workspace) picks up where you left off.
+  persistUiState() {
+    const { traces, activeTraceIndex, stepIndex } = get();
+    const activeTraceId = traces[activeTraceIndex]?.traceId ?? null;
+    saveUiState({ activeTraceId, stepIndex }).catch(() => {});
   },
 }));

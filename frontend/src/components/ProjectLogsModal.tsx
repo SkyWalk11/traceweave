@@ -1,10 +1,41 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store/useStore";
+import { parseAnsiLine } from "../utils/ansi";
 import type { Project } from "../types";
 
 interface Props {
   project: Project;
   onClose: () => void;
+}
+
+// Splits a line into plain/matched segments around every case-insensitive
+// occurrence of `query`, for <mark>-highlighting without re-implementing a
+// regex-safe search — case-insensitive indexOf is enough for log grepping.
+function highlightMatches(line: string, query: string): React.ReactNode {
+  if (!query) return line;
+  const lower = line.toLowerCase();
+  const q = query.toLowerCase();
+  const parts: React.ReactNode[] = [];
+  let i = 0;
+  let idx = lower.indexOf(q);
+  while (idx !== -1) {
+    if (idx > i) parts.push(line.slice(i, idx));
+    parts.push(<mark key={idx}>{line.slice(idx, idx + q.length)}</mark>);
+    i = idx + q.length;
+    idx = lower.indexOf(q, i);
+  }
+  if (i < line.length) parts.push(line.slice(i));
+  return parts;
+}
+
+// ANSI color segments first (real terminal colors the process itself emitted),
+// then the search-match highlight within each segment's text.
+function renderLine(line: string, query: string): React.ReactNode {
+  return parseAnsiLine(line).map((seg, i) => (
+    <span key={i} className={seg.className}>
+      {highlightMatches(seg.text, query)}
+    </span>
+  ));
 }
 
 export function ProjectLogsModal({ project, onClose }: Props) {
@@ -20,6 +51,13 @@ export function ProjectLogsModal({ project, onClose }: Props) {
   const [editingCommand, setEditingCommand] = useState(false);
   const [commandDraft, setCommandDraft] = useState(project.runCommand ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filteredLines = useMemo(() => {
+    if (!search.trim()) return lines;
+    const q = search.trim().toLowerCase();
+    return lines.filter((l) => l.toLowerCase().includes(q));
+  }, [lines, search]);
 
   useEffect(() => {
     loadProjectLogs(project.id);
@@ -81,11 +119,26 @@ export function ProjectLogsModal({ project, onClose }: Props) {
           </button>
         </div>
         {error && <div className="error">{error}</div>}
+        <div className="logs-search">
+          <input
+            placeholder="Search logs…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search.trim() && (
+            <span className="logs-search-count">
+              {filteredLines.length} / {lines.length}
+            </span>
+          )}
+        </div>
         <div className="logs-body">
           {lines.length === 0 && <div className="logs-empty">No output yet.</div>}
-          {lines.map((line, i) => (
+          {lines.length > 0 && filteredLines.length === 0 && (
+            <div className="logs-empty">No lines match "{search}".</div>
+          )}
+          {filteredLines.map((line, i) => (
             <div key={i} className="logs-line">
-              {line}
+              {renderLine(line, search.trim())}
             </div>
           ))}
         </div>
@@ -103,8 +156,21 @@ export function ProjectLogsModal({ project, onClose }: Props) {
                 placeholder="Run command, e.g. npm run dev"
                 value={commandDraft}
                 onChange={(e) => setCommandDraft(e.target.value)}
-                onBlur={saveCommand}
               />
+              <button type="submit" className="icon-btn" title="Save">
+                ✓
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                title="Cancel"
+                onClick={() => {
+                  setCommandDraft(project.runCommand ?? "");
+                  setEditingCommand(false);
+                }}
+              >
+                ✕
+              </button>
             </form>
           ) : (
             <span className="run-command-display">
