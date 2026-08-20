@@ -581,6 +581,49 @@
   text-decoration: underline;
 }
 
+.step-list-pattern-filter {
+  display: flex;
+  gap: 4px;
+  margin: 0 8px 6px;
+}
+
+.step-list-pattern-filter input {
+  flex: 1;
+  min-width: 0;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #eee;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+.step-list-pattern-filter button {
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 4px 6px;
+  background: #222;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.step-list-pattern-filter button:hover:not(:disabled) {
+  border-color: #666;
+  color: #eee;
+}
+
+.step-list-pattern-filter button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.step-list-file-row.pattern-match {
+  background: #1c2438;
+}
+
 .step-list-file-checklist {
   flex: 0 0 auto;
   max-height: 40%;

@@ -19,6 +19,7 @@ export function StepList({ width }: Props) {
   const [query, setQuery] = useState("");
   const [fileFilter, setFileFilter] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
+  const [pattern, setPattern] = useState("");
 
   const steps = traces[activeTraceIndex]?.steps ?? [];
 
@@ -37,6 +38,23 @@ export function StepList({ width }: Props) {
     return [...seen.values()].sort((a, b) => a.service.localeCompare(b.service) || a.file.localeCompare(b.file));
   }, [steps]);
 
+  const patternLower = pattern.trim().toLowerCase();
+  // Files matching the typed pattern (by path or service name) — used both
+  // to highlight rows in the checklist and to bulk-populate fileFilter via
+  // the Include/Exclude buttons, instead of clicking every checkbox by hand
+  // (the real pain point once a trace has dozens of distinct files, e.g.
+  // Filament's per-Resource getPages/getRelations noise).
+  const matchingKeys = useMemo(() => {
+    if (!patternLower) return new Set<string>();
+    return new Set(
+      distinctFiles
+        .filter(
+          ({ service, file }) => file.toLowerCase().includes(patternLower) || service.toLowerCase().includes(patternLower)
+        )
+        .map(({ service, file }) => fileKey(service, file))
+    );
+  }, [distinctFiles, patternLower]);
+
   if (steps.length === 0) return null;
 
   function toggleFile(key: string) {
@@ -45,6 +63,20 @@ export function StepList({ width }: Props) {
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
+    });
+  }
+
+  function includeMatching() {
+    setFileFilter((prev) => new Set([...prev, ...matchingKeys]));
+  }
+
+  function excludeMatching() {
+    setFileFilter((prev) => {
+      // An empty filter means "show everything" — to exclude something from
+      // that implicit state, first make it explicit (select every file),
+      // then remove the matches from it.
+      const base = prev.size > 0 ? prev : new Set(distinctFiles.map(({ service, file }) => fileKey(service, file)));
+      return new Set([...base].filter((k) => !matchingKeys.has(k)));
     });
   }
 
@@ -87,25 +119,53 @@ export function StepList({ width }: Props) {
       </button>
 
       {filterOpen && (
-        <div className="step-list-file-checklist">
-          {distinctFiles.map(({ service, file, count }) => {
-            const key = fileKey(service, file);
-            const slash = file.lastIndexOf("/");
-            const basename = slash === -1 ? file : file.slice(slash + 1);
-            const dir = slash === -1 ? "" : file.slice(0, slash);
-            return (
-              <label key={key} className="step-list-file-row" title={file}>
-                <input type="checkbox" checked={fileFilter.has(key)} onChange={() => toggleFile(key)} />
-                <span className="step-list-file-text">
-                  <span className="step-list-file-basename">{basename}</span>
-                  {dir && <span className="step-list-file-dir">{dir}</span>}
-                </span>
-                <span className="step-list-file-service">{service}</span>
-                <span className="step-list-file-count">{count}</span>
-              </label>
-            );
-          })}
-        </div>
+        <>
+          <div className="step-list-pattern-filter">
+            <input
+              type="text"
+              placeholder="Pattern, e.g. Filament…"
+              value={pattern}
+              onChange={(e) => setPattern(e.target.value)}
+            />
+            <button
+              disabled={matchingKeys.size === 0}
+              title="Show only files matching the pattern"
+              onClick={includeMatching}
+            >
+              + Include{matchingKeys.size > 0 ? ` (${matchingKeys.size})` : ""}
+            </button>
+            <button
+              disabled={matchingKeys.size === 0}
+              title="Hide files matching the pattern"
+              onClick={excludeMatching}
+            >
+              − Exclude{matchingKeys.size > 0 ? ` (${matchingKeys.size})` : ""}
+            </button>
+          </div>
+          <div className="step-list-file-checklist">
+            {distinctFiles.map(({ service, file, count }) => {
+              const key = fileKey(service, file);
+              const slash = file.lastIndexOf("/");
+              const basename = slash === -1 ? file : file.slice(slash + 1);
+              const dir = slash === -1 ? "" : file.slice(0, slash);
+              return (
+                <label
+                  key={key}
+                  className={"step-list-file-row" + (matchingKeys.has(key) ? " pattern-match" : "")}
+                  title={file}
+                >
+                  <input type="checkbox" checked={fileFilter.has(key)} onChange={() => toggleFile(key)} />
+                  <span className="step-list-file-text">
+                    <span className="step-list-file-basename">{basename}</span>
+                    {dir && <span className="step-list-file-dir">{dir}</span>}
+                  </span>
+                  <span className="step-list-file-service">{service}</span>
+                  <span className="step-list-file-count">{count}</span>
+                </label>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <div className="step-list-items">
