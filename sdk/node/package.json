@@ -1,0 +1,32 @@
+{
+  "name": "ttd-capture",
+  "version": "0.1.0",
+  "description": "Node capture SDK for Traceweave: record step snapshots from real Node.js code and send them to the Traceweave backend. Package name (ttd-capture) is kept stable on purpose — it's the actual import specifier real services depend on.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./express": "./dist/express.js",
+    "./auto": "./dist/auto.js",
+    "./debug-agent": "./dist/debug-agent.js",
+    "./instrument": "./dist/instrument.js",
+    "./instrument-runtime": "./dist/instrument-runtime.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "example:a": "tsx examples/two-services/service-a.ts",
+    "example:b": "tsx examples/two-services/service-b.ts",
+    "example:auto": "tsx --import ./dist/auto.js examples/auto/service.ts"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12"
+  },
+  "dependencies": {
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "typescript": "^5.9.3"
+  }
+}
