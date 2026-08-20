@@ -16,7 +16,7 @@ import { recordStep } from "./index.js";
 // collapses to a placeholder at any depth via the constructor check below,
 // so raising this doesn't reopen the "walk megabytes of Node internals"
 // risk the cap exists for.
-const MAX_SNAPSHOT_DEPTH = 6;
+const MAX_SNAPSHOT_DEPTH = 20;
 
 function snapshot(value: unknown, depth = 0): unknown {
   if (value === null || value === undefined) return value;

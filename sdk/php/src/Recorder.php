@@ -71,7 +71,7 @@ final class Recorder
     // instance collapses to a placeholder at any depth via the check below,
     // so raising this doesn't reopen the "walk a PDO connection/Eloquent
     // model" risk the cap exists for.
-    private const MAX_SNAPSHOT_DEPTH = 6;
+    private const MAX_SNAPSHOT_DEPTH = 20;
 
     // Every parameter is captured automatically (not opted into, unlike a
     // manual recordStep() call), so this will regularly see things that
