@@ -9,6 +9,9 @@
   "autoload": {
     "psr-4": {
       "TtdCapture\\": "src/"
-    }
+    },
+    "files": [
+      "src/GuzzleTraceHeader.php"
+    ]
   }
 }

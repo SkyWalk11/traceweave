@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useStore } from "../store/useStore";
 import { languageFor } from "../utils/language";
@@ -19,7 +19,6 @@ export function ServicePane({ pane, width, grow }: Props) {
   const sourceCache = useStore((s) => s.sourceCache);
   const breakpoints = useStore((s) => s.breakpoints);
   const toggleBreakpoint = useStore((s) => s.toggleBreakpoint);
-  const stepIndex = useStore((s) => s.stepIndex);
   const trace = useStore((s) => s.traces[s.activeTraceIndex]);
   const { service, step, reached, active } = pane;
   // The last pane grows to fill any leftover space so panes always cover
@@ -42,16 +41,29 @@ export function ServicePane({ pane, width, grow }: Props) {
     return files;
   }, [trace, service]);
 
-  // A manually-clicked tab "pins" the view to that file until the next
-  // step navigation, which snaps back to following the current step's file
-  // — same as how an IDE's own cursor movement overrides a manually opened
-  // tab's scroll position.
+  // A manually-clicked tab "pins" the view to that file. It's only cleared
+  // when *this service's own* live step genuinely advances to a different
+  // file — tracked via a ref of the last live file rather than reacting to
+  // every change of step.file, because stepping back before this service's
+  // first step (reached briefly goes false, step.file goes to undefined)
+  // must not count as "advancing" and blow away a pinned tab; returning to
+  // the same live file afterwards should find the pin exactly as it was.
   const [pinnedFile, setPinnedFile] = useState<string | null>(null);
+  const lastLiveFile = useRef<string | null>(null);
   useEffect(() => {
-    setPinnedFile(null);
-  }, [stepIndex]);
+    if (step?.file && step.file !== lastLiveFile.current) {
+      setPinnedFile(null);
+      lastLiveFile.current = step.file;
+    }
+  }, [step?.file]);
 
-  if (!reached || !step) {
+  const liveFile = reached ? (step?.file ?? null) : null;
+  const displayFile = pinnedFile && tabFiles.includes(pinnedFile) ? pinnedFile : liveFile;
+  const isLiveFile = displayFile !== null && displayFile === liveFile;
+
+  // Nothing to show only when this service has neither reached a step yet
+  // nor had any of its files manually pinned open.
+  if (!displayFile) {
     return (
       <div className="pane service-pane pending" style={{ flex }}>
         <div className="pane-header">
@@ -63,13 +75,11 @@ export function ServicePane({ pane, width, grow }: Props) {
     );
   }
 
-  const displayFile = pinnedFile && tabFiles.includes(pinnedFile) ? pinnedFile : step.file;
-  const isLiveFile = displayFile === step.file;
   const code = sourceCache[sourceKey(service, displayFile)] ?? "";
 
   const onMount: OnMount = (editor, monaco) => {
     registerHoverProvider(monaco, languageFor(displayFile));
-    if (isLiveFile) {
+    if (isLiveFile && step) {
       setModelStepData(editor.getModel()!, {
         function: step.function,
         inputs: step.inputs,
@@ -87,7 +97,7 @@ export function ServicePane({ pane, width, grow }: Props) {
       [
         // Only the file the current step is actually in gets the "you are
         // here" line marker — a pinned-open historical tab has no such line.
-        ...(isLiveFile
+        ...(isLiveFile && step
           ? [
               {
                 range: new monaco.Range(step.line, 1, step.line, 1),
@@ -125,9 +135,9 @@ export function ServicePane({ pane, width, grow }: Props) {
           {tabFiles.map((file) => (
             <button
               key={file}
-              className={"pane-tab" + (file === displayFile ? " active" : "") + (file === step.file ? " live" : "")}
+              className={"pane-tab" + (file === displayFile ? " active" : "") + (file === liveFile ? " live" : "")}
               title={file}
-              onClick={() => setPinnedFile(file === step.file ? null : file)}
+              onClick={() => setPinnedFile(file === liveFile ? null : file)}
             >
               {basename(file)}
             </button>
@@ -136,7 +146,7 @@ export function ServicePane({ pane, width, grow }: Props) {
       )}
       <div className="pane-editor">
         <Editor
-          key={`${service}-${displayFile}-${isLiveFile ? step.line : 0}`}
+          key={`${service}-${displayFile}-${isLiveFile && step ? step.line : 0}`}
           height="100%"
           language={languageFor(displayFile)}
           theme="vs-dark"
@@ -146,10 +156,16 @@ export function ServicePane({ pane, width, grow }: Props) {
         />
       </div>
       <div className="pane-vars">
-        <div className="pane-vars-label">Inputs</div>
-        <JsonView data={step.inputs} />
-        <div className="pane-vars-label">Locals</div>
-        <JsonView data={step.locals} />
+        {step ? (
+          <>
+            <div className="pane-vars-label">Inputs</div>
+            <JsonView data={step.inputs} />
+            <div className="pane-vars-label">Locals</div>
+            <JsonView data={step.locals} />
+          </>
+        ) : (
+          <div className="pane-waiting">not reached at this step yet</div>
+        )}
       </div>
     </div>
   );

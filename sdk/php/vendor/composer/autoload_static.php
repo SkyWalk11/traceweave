@@ -6,6 +6,10 @@ namespace Composer\Autoload;
 
 class ComposerStaticInit29bfefa6fd7c96cacd8e264bd4462768
 {
+    public static $files = array (
+        '9a2e19c0aab3fd0cd5fa5716f9d6d1fa' => __DIR__ . '/../..' . '/src/GuzzleTraceHeader.php',
+    );
+
     public static $prefixLengthsPsr4 = array (
         'T' =>
         array (
