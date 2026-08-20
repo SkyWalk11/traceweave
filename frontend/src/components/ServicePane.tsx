@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useStore } from "../store/useStore";
 import { languageFor } from "../utils/language";
@@ -41,21 +41,17 @@ export function ServicePane({ pane, width, grow }: Props) {
     return files;
   }, [trace, service]);
 
-  // A manually-clicked tab "pins" the view to that file. It's only cleared
-  // when *this service's own* live step genuinely advances to a different
-  // file — tracked via a ref of the last live file rather than reacting to
-  // every change of step.file, because stepping back before this service's
-  // first step (reached briefly goes false, step.file goes to undefined)
-  // must not count as "advancing" and blow away a pinned tab; returning to
-  // the same live file afterwards should find the pin exactly as it was.
+  // A manually-clicked tab "pins" the view to that file — and, like a real
+  // IDE tab, it stays pinned no matter what stepping happens elsewhere,
+  // until you explicitly click a different tab (or click the live-marked
+  // tab again to return to following it). An earlier version tried to
+  // auto-reset this whenever the pane's own "current step" recomputed, but
+  // that recompute happens on *every* global step-index change regardless
+  // of which service you actually navigated through — stepping through
+  // some other service could silently shift what counts as "this service's
+  // current step" underneath you and blow the pin away for no reason
+  // visible to the user.
   const [pinnedFile, setPinnedFile] = useState<string | null>(null);
-  const lastLiveFile = useRef<string | null>(null);
-  useEffect(() => {
-    if (step?.file && step.file !== lastLiveFile.current) {
-      setPinnedFile(null);
-      lastLiveFile.current = step.file;
-    }
-  }, [step?.file]);
 
   const liveFile = reached ? (step?.file ?? null) : null;
   const displayFile = pinnedFile && tabFiles.includes(pinnedFile) ? pinnedFile : liveFile;
