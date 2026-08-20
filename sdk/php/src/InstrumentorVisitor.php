@@ -15,12 +15,16 @@ final class InstrumentorVisitor extends NodeVisitorAbstract
     public array $insertions = [];
 
     /**
-     * Enclosing function/method/closure names, innermost last — lets a
+     * Enclosing function/method/closure frames, innermost last — lets a
      * `return` statement attribute itself to whichever function it actually
      * belongs to (not an outer one it happens to be lexically nested under),
      * since push/pop timing follows the traverser's own depth-first order.
+     * Each frame's entryOffset lets a return that turns out to *be* the
+     * function's only statement (e.g. `function getPages(): array { return
+     * [...]; }` — extremely common for one-line accessor-style methods) skip
+     * inserting a second, identical record call right on top of the first.
      *
-     * @var array<int, string>
+     * @var array<int, array{name: string, entryOffset: int|null}>
      */
     private array $stack = [];
 
@@ -37,7 +41,7 @@ final class InstrumentorVisitor extends NodeVisitorAbstract
                 $this->insertions[] = [$offset, self::recordCall($name, $node->getStartLine())];
             }
 
-            $this->stack[] = $name;
+            $this->stack[] = ['name' => $name, 'entryOffset' => is_int($offset) ? $offset : null];
             return null;
         }
 
@@ -48,9 +52,12 @@ final class InstrumentorVisitor extends NodeVisitorAbstract
         // held by the time the function returned.
         if ($node instanceof Return_ && $this->stack !== []) {
             $offset = $node->getAttribute('startFilePos');
-            if (is_int($offset)) {
-                $name = $this->stack[count($this->stack) - 1];
-                $this->insertions[] = [$offset, self::recordCall($name, $node->getStartLine())];
+            $frame = $this->stack[count($this->stack) - 1];
+            // Same offset as the entry capture means this return *is* the
+            // function's first (and only) statement — recording it again
+            // here would just duplicate the exact same call/line/vars.
+            if (is_int($offset) && $offset !== $frame['entryOffset']) {
+                $this->insertions[] = [$offset, self::recordCall($frame['name'], $node->getStartLine())];
             }
         }
 
@@ -64,7 +71,8 @@ final class InstrumentorVisitor extends NodeVisitorAbstract
         }
         if ($node->stmts === null) return null;
 
-        $name = array_pop($this->stack);
+        $frame = array_pop($this->stack);
+        $name = $frame['name'];
 
         // Best-effort "falls off the end without an explicit return" case —
         // only checks the body's last top-level statement, not full
