@@ -12,6 +12,12 @@ import { recordStep } from "./index.js";
 // descriptive placeholder instead of walking it — cheaper than serializing
 // megabytes of Node internals only to throw them away, and far more
 // readable in the UI than a wall of "[Circular]".
+// Only the depth limit for plain data (objects/arrays) — a class instance
+// collapses to a placeholder at any depth via the constructor check below,
+// so raising this doesn't reopen the "walk megabytes of Node internals"
+// risk the cap exists for.
+const MAX_SNAPSHOT_DEPTH = 6;
+
 function snapshot(value: unknown, depth = 0): unknown {
   if (value === null || value === undefined) return value;
 
@@ -21,18 +27,26 @@ function snapshot(value: unknown, depth = 0): unknown {
   if (type === "function") return `[Function: ${(value as { name?: string }).name || "anonymous"}]`;
   if (type !== "object") return String(value);
 
-  if (depth >= 2) return Array.isArray(value) ? `[Array(${(value as unknown[]).length})]` : "[Object]";
-
-  if (Array.isArray(value)) return value.slice(0, 20).map((v) => snapshot(v, depth + 1));
+  if (Array.isArray(value)) {
+    if (depth >= MAX_SNAPSHOT_DEPTH) return `[Array(${value.length})]`;
+    return value.slice(0, 20).map((v) => snapshot(v, depth + 1));
+  }
 
   // Node's own classes (IncomingMessage, Socket, ...) don't set
   // Symbol.toStringTag, so Object.prototype.toString on them is
   // indistinguishable from a plain "{}" literal — the actual reliable check
-  // for "is this a plain object" is the constructor identity.
+  // for "is this a plain object" is the constructor identity. Checked
+  // *before* the depth cap (not after) so a class instance collapses to a
+  // short placeholder at any depth — a nested request/response body (the
+  // common case: an array of plain objects several levels deep) previously
+  // hit the depth cap before ever reaching this check, collapsing to
+  // "[Object]" even though it was perfectly safe, ordinary JSON data.
   const ctor = (value as object).constructor;
   if (ctor !== undefined && ctor !== Object) {
     return `[${ctor.name || "Object"}]`;
   }
+
+  if (depth >= MAX_SNAPSHOT_DEPTH) return "[Object]";
 
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(value as object).slice(0, 30)) {

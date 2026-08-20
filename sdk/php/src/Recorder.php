@@ -67,6 +67,12 @@ final class Recorder
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 
+    // Only the depth limit for plain data (arrays/stdClass) — a real class
+    // instance collapses to a placeholder at any depth via the check below,
+    // so raising this doesn't reopen the "walk a PDO connection/Eloquent
+    // model" risk the cap exists for.
+    private const MAX_SNAPSHOT_DEPTH = 6;
+
     // Every parameter is captured automatically (not opted into, unlike a
     // manual recordStep() call), so this will regularly see things that
     // were never meant to be "data": a PDO connection, an Eloquent model
@@ -85,28 +91,29 @@ final class Recorder
         if ($value instanceof \Closure) {
             return '[Closure]';
         }
-        if ($depth >= 2) {
-            return is_array($value) ? '[Array(' . count($value) . ')]' : '[' . get_debug_type($value) . ']';
-        }
-        if (is_array($value)) {
-            $out = [];
-            $i = 0;
-            foreach ($value as $k => $v) {
-                if (++$i > 20) break;
-                $out[$k] = self::snapshot($v, $depth + 1);
-            }
-            return $out;
-        }
-        if (is_object($value)) {
+        if (is_object($value) && !($value instanceof \stdClass)) {
             // A plain stdClass (e.g. json_decode output) is close enough to
-            // an array literal to walk; anything else is a class instance —
-            // identify it without touching its internals.
-            if ($value instanceof \stdClass) {
-                return self::snapshot((array) $value, $depth);
-            }
+            // an array literal to walk safely; anything else is a real class
+            // instance — identify it without touching its internals, at any
+            // depth. Checked *before* the depth cap below (not after) so an
+            // array of stdClass objects several levels deep (a normal
+            // nested request/response body) doesn't hit the cap before ever
+            // reaching this check.
             return '[' . get_class($value) . ']';
         }
-        return '[' . get_debug_type($value) . ']';
+        if ($depth >= self::MAX_SNAPSHOT_DEPTH) {
+            return is_array($value) ? '[Array(' . count($value) . ')]' : '[Object]';
+        }
+        if ($value instanceof \stdClass) {
+            $value = (array) $value;
+        }
+        $out = [];
+        $i = 0;
+        foreach ($value as $k => $v) {
+            if (++$i > 20) break;
+            $out[$k] = self::snapshot($v, $depth + 1);
+        }
+        return $out;
     }
 
     private static function send(array $payload): void
