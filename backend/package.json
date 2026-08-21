@@ -4,11 +4,11 @@
   "description": "Traceweave backend: trace ingestion, source serving, and process orchestration.",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/server.ts",
+    "dev": "bun --watch --env-file=.env src/server.ts",
     "build": "tsc",
-    "start": "node --env-file=.env dist/server.js",
+    "start": "bun --env-file=.env dist/server.js",
     "typecheck": "tsc --noEmit",
-    "mock-trace": "tsx --env-file=.env src/scripts/mock-trace.ts"
+    "mock-trace": "bun --env-file=.env src/scripts/mock-trace.ts"
   },
   "keywords": [],
   "author": "",
@@ -22,7 +22,6 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.2.0",
     "@types/ws": "^8.18.1",
-    "tsx": "^4.23.12",
     "typescript": "^7.0.2"
   }
 }

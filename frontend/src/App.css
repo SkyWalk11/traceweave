@@ -950,6 +950,14 @@
   background: #161616;
 }
 
+.pane-vars-note {
+  font-family: system-ui, sans-serif;
+  font-size: 10px;
+  opacity: 0.5;
+  font-style: italic;
+  margin-bottom: 6px;
+}
+
 .pane-vars-label {
   margin: 8px 0 4px;
   opacity: 0.55;

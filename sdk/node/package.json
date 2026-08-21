@@ -16,14 +16,13 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "example:a": "tsx examples/two-services/service-a.ts",
-    "example:b": "tsx examples/two-services/service-b.ts",
-    "example:auto": "tsx --import ./dist/auto.js examples/auto/service.ts"
+    "example:a": "bun examples/two-services/service-a.ts",
+    "example:b": "bun examples/two-services/service-b.ts",
+    "example:auto": "bun --preload ./dist/auto.js examples/auto/service.ts"
   },
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^26.2.0",
-    "tsx": "^4.23.12"
+    "@types/node": "^26.2.0"
   },
   "dependencies": {
     "@jridgewell/trace-mapping": "^0.3.31",

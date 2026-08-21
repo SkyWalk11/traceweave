@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useStore } from "../store/useStore";
 import { languageFor } from "../utils/language";
@@ -53,12 +53,23 @@ export function ServicePane({ pane, width, grow }: Props) {
   // visible to the user.
   const [pinnedFile, setPinnedFile] = useState<string | null>(null);
 
+  // Remembers the last real step this pane ever showed, so rewinding to
+  // before this service's first occurrence (reached goes false) keeps
+  // showing that last-known code/inputs/locals instead of blanking back to
+  // "waiting…" — the same "don't erase what I've already seen" behavior as
+  // a manually pinned tab, just automatic. Mutated directly during render
+  // (not in an effect) so there's no one-render flash of the old value
+  // before catching up.
+  const lastKnownStep = useRef<typeof step>(null);
+  if (step) lastKnownStep.current = step;
+  const fallbackStep = reached ? step : lastKnownStep.current;
+
   const liveFile = reached ? (step?.file ?? null) : null;
-  const displayFile = pinnedFile && tabFiles.includes(pinnedFile) ? pinnedFile : liveFile;
+  const displayFile = pinnedFile && tabFiles.includes(pinnedFile) ? pinnedFile : (fallbackStep?.file ?? null);
   const isLiveFile = displayFile !== null && displayFile === liveFile;
 
-  // Nothing to show only when this service has neither reached a step yet
-  // nor had any of its files manually pinned open.
+  // Nothing to show only when this service has never reached a step at all
+  // (not even earlier in the trace) and nothing's been manually pinned.
   if (!displayFile) {
     return (
       <div className="pane service-pane pending" style={{ flex }}>
@@ -152,12 +163,13 @@ export function ServicePane({ pane, width, grow }: Props) {
         />
       </div>
       <div className="pane-vars">
-        {step ? (
+        {fallbackStep ? (
           <>
+            {!reached && <div className="pane-vars-note">not reached at this step — showing last-known values</div>}
             <div className="pane-vars-label">Inputs</div>
-            <JsonView data={step.inputs} />
+            <JsonView data={fallbackStep.inputs} />
             <div className="pane-vars-label">Locals</div>
-            <JsonView data={step.locals} />
+            <JsonView data={fallbackStep.locals} />
           </>
         ) : (
           <div className="pane-waiting">not reached at this step yet</div>
