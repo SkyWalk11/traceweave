@@ -48,8 +48,11 @@ end up matching what was actually built).
 
 ## Getting started
 
+Requires [Bun](https://bun.com) 1.4+ — the backend and SDK dev scripts run on it directly
+(no separate `tsx`/build step needed for TypeScript).
+
 ```bash
-make install   # npm install in both + seed .env files
+make install   # bun install in both + seed .env files
 make dev       # runs backend (:4000 by default) and frontend (:5173) together, Ctrl+C stops both
 make stop      # safety net if a previous `make dev` didn't shut down cleanly
 ```
@@ -57,8 +60,8 @@ make stop      # safety net if a previous `make dev` didn't shut down cleanly
 Or run each independently:
 
 ```bash
-cd backend && npm install && npm run dev   # tsx watch, listens on :4000
-cd frontend && npm install && npm run dev  # vite dev server, :5173 (or next free port)
+cd backend && bun install && bun run dev   # bun --watch, listens on :4000
+cd frontend && bun install && bun run dev  # vite dev server, :5173 (or next free port)
 ```
 
 Open the frontend URL, then:
@@ -86,6 +89,6 @@ SDK docs: [`sdk/node/README.md`](sdk/node/README.md) (zero-edit hook, manual `re
 API, live logpoint breakpoints) and [`sdk/php`](sdk/php) (stream-wrapper instrumentation,
 `Recorder::currentTraceId()` for propagating traces across an outgoing PHP HTTP call).
 
-Other useful scripts: `npm run typecheck` (both), `npm run build` (backend emits to `dist/`
+Other useful scripts: `bun run typecheck` (both), `bun run build` (backend emits to `dist/`
 via `tsc`; frontend typechecks then runs `vite build`), `make mock-trace` (backend) for a
 quick smoke test with fake trace data instead of a real running service.
